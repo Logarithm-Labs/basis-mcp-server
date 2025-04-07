@@ -6,8 +6,9 @@ This MCP (Model Context Protocol) server provides tools to interact with the Met
 
 - View allocated assets and vaults
 - Get claimable assets information
-- Prepare transactions for allocating, claiming, redeeming, and withdrawing assets
-- All smart contract functions exposed as tools
+- Get share pice info
+- Prepare transactions for allocating, redeeming, and withdrawing assets
+- All smart contract functions related to a curator exposed as tools
 
 ## Setup
 
@@ -55,13 +56,13 @@ Add the following to the configuration:
 ```json
 {
     "mcpServers": {
-        "weather": {
+        "metavault": {
             "command": "uv",
             "args": [
                 "--directory",
-                "/ABSOLUTE/PATH/TO/PARENT/FOLDER/weather",
+                "/ABSOLUTE/PATH/TO/PARENT/FOLDER/logarithm-mcp-server",
                 "run",
-                "weather.py"
+                "metavault.py"
             ]
         }
     }
@@ -71,13 +72,13 @@ Add the following to the configuration:
 ```json
 {
     "mcpServers": {
-        "weather": {
+        "metavault": {
             "command": "uv",
             "args": [
                 "--directory",
-                "C:\\ABSOLUTE\\PATH\\TO\\PARENT\\FOLDER\\weather",
+                "C:\\ABSOLUTE\\PATH\\TO\\PARENT\\FOLDER\\logarithm-mcp-server",
                 "run",
-                "weather.py"
+                "metavault.py"
             ]
         }
     }
@@ -96,11 +97,11 @@ Add the following to the configuration:
 - `get_allocation_withdraw_keys(vault_address)` - Get withdraw keys for a vault
 - `get_claimable_vaults()` - Get vaults with claimable assets
 - `get_idle_assets()` - Get total idle assets
+- `get_share_price()` - Get the share price
 
 ### Transaction Preparation Functions
 
 - `prepare_allocate_transaction(from_address, targets, assets)` - Prepare allocation transaction
-- `prepare_claim_allocations_transaction(from_address)` - Prepare claim transaction
 - `prepare_redeem_allocations_transaction(from_address, targets, shares)` - Prepare redemption transaction
 - `prepare_withdraw_allocations_transaction(from_address, targets, assets)` - Prepare withdrawal transaction
 
