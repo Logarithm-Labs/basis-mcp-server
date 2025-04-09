@@ -391,6 +391,20 @@ async def get_share_price(contract_address: str) -> str:
     share_price = (total_assets * (10 ** decimals)) // total_supply
     return str(share_price)
 
+@mcp.tool()
+async def get_total_pending_withdraw(contract_address: str) -> str:
+    """Get the total amount of assets pending withdrawal from the vault.
+    
+    Args:
+        contract_address (str): Address of the LogarithmVault contract
+        
+    Returns:
+        str: The total pending withdraw amount as a string (to preserve full precision)
+    """
+    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
+    result = contract.functions.totalPendingWithdraw().call()
+    return str(result)
+
 if __name__ == "__main__":
     # Run the MCP server
     mcp.run(transport='stdio')
