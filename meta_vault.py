@@ -90,15 +90,23 @@ async def get_idle_assets() -> str:
 
 @mcp.tool()
 async def get_share_price() -> str:
-    """Get the share price.
-
+    """Calculate the share price of the vault.
+    
+    The share price is calculated as: totalAssets / totalSupply
+        
     Returns:
         str: The share price as a string (to preserve full precision)
     """
+
     contract = get_contract(CONTRACT_ADDRESS, META_VAULT_ABI_PATH)
     total_supply = contract.functions.totalSupply().call()
     total_assets = contract.functions.totalAssets().call()
     decimals = contract.functions.decimals().call()
+
+    if total_supply == 0:
+        return "0"
+
+    # Calculate share price with proper decimal handling
     result = total_assets * (10 ** decimals) // total_supply if total_supply > 0 else 0
     return str(result)
 

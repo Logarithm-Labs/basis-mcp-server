@@ -367,6 +367,30 @@ async def get_available_contracts() -> List[str]:
     """
     return AVAILABLE_CONTRACTS
 
+@mcp.tool()
+async def get_share_price(contract_address: str) -> str:
+    """Calculate the share price of the vault.
+    
+    The share price is calculated as: totalAssets / totalSupply
+    
+    Args:
+        contract_address (str): Address of the LogarithmVault contract
+        
+    Returns:
+        str: The share price as a string (to preserve full precision)
+    """
+    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
+    total_assets = contract.functions.totalAssets().call()
+    total_supply = contract.functions.totalSupply().call()
+    decimals = contract.functions.decimals().call()
+    
+    if total_supply == 0:
+        return "0"
+        
+    # Calculate share price with proper decimal handling
+    share_price = (total_assets * (10 ** decimals)) // total_supply
+    return str(share_price)
+
 if __name__ == "__main__":
     # Run the MCP server
     mcp.run(transport='stdio')
