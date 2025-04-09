@@ -12,7 +12,7 @@ mcp = FastMCP("metavault")
 # Read-only functions
 @mcp.tool()
 async def get_allocated_assets() -> str:
-    """Get the total allocated assets across core vaults.
+    """Get the total allocated assets across logarithm vaults.
 
     Returns:
         str: The total allocated assets as a string (to preserve full precision)
@@ -24,10 +24,10 @@ async def get_allocated_assets() -> str:
 
 @mcp.tool()
 async def get_allocated_vaults() -> List[str]:
-    """Get the list of core vaults that currently have allocations.
+    """Get the list of logarithm vaults that currently have allocations.
 
     Returns:
-        List[str]: List of core vault addresses
+        List[str]: List of logarithm vault addresses
     """
     contract = get_contract(CONTRACT_ADDRESS, META_VAULT_ABI_PATH)
     result = contract.functions.allocatedVaults().call()
@@ -36,7 +36,7 @@ async def get_allocated_vaults() -> List[str]:
 
 @mcp.tool()
 async def get_allocation_claimable_assets() -> Dict[str, str]:
-    """Get the requested and claimable assets amounts from core vaults.
+    """Get the requested and claimable assets amounts from logarithm vaults.
 
     Returns:
         Dict[str, str]: Dictionary with requestedAssets and claimableAssets
@@ -50,27 +50,27 @@ async def get_allocation_claimable_assets() -> Dict[str, str]:
 
 
 @mcp.tool()
-async def get_allocation_withdraw_keys(core_vault_address: str) -> List[str]:
-    """Get the withdrawal keys and a core vault.
+async def get_allocation_withdraw_keys(logarithm_vault_address: str) -> List[str]:
+    """Get the withdrawal keys and a logarithm vault.
     
     Args:
-        core_vault_address (str): Address of the core vault
+        logarithm_vault_address (str): Address of the logarithm vault
         
     Returns:
         List[str]: List of withdraw keys as hex strings
     """
     contract = get_contract(CONTRACT_ADDRESS, META_VAULT_ABI_PATH)
-    checksum_address = validate_address(core_vault_address)
+    checksum_address = validate_address(logarithm_vault_address)
     result = contract.functions.allocationWithdrawKeys(checksum_address).call()
     return [to_hex(key) for key in result]
 
 
 @mcp.tool()
 async def get_claimable_vaults() -> List[str]:
-    """Get the list of core vaults that have claimable assets.
+    """Get the list of logarithm vaults that have claimable assets.
 
     Returns:
-        List[str]: List of core vault addresses
+        List[str]: List of logarithm vault addresses
     """
     contract = get_contract(CONTRACT_ADDRESS, META_VAULT_ABI_PATH)
     result = contract.functions.claimableVaults().call()
@@ -109,11 +109,11 @@ async def get_share_price() -> str:
 async def prepare_allocate_transaction(
     from_address: str, targets: List[str], assets: List[str]
 ) -> str:
-    """Prepare a transaction to allocate assets to multiple core vaults.
+    """Prepare a transaction to allocate assets to multiple logarithm vaults.
     
     Args:
         from_address (str): Address that will send the transaction
-        targets (List[str]): List of core vault addresses to allocate to
+        targets (List[str]): List of logarithm vault addresses to allocate to
         assets (List[str]): List of asset amounts to allocate (as strings to preserve precision)
         
     Returns:
@@ -146,12 +146,12 @@ async def prepare_allocate_transaction(
 async def prepare_redeem_allocations_transaction(
     from_address: str, targets: List[str], shares: List[str]
 ) -> str:
-    """Prepare a transaction to redeem shares from multiple core vaults.
+    """Prepare a transaction to redeem shares from multiple logarithm vaults.
     
     Args:
         
         from_address (str): Address that will send the transaction
-        targets (List[str]): List of core vault addresses to redeem from
+        targets (List[str]): List of logarithm vault addresses to redeem from
         shares (List[str]): List of share amounts to redeem (as strings to preserve precision)
         
     Returns:
@@ -184,11 +184,11 @@ async def prepare_redeem_allocations_transaction(
 async def prepare_withdraw_allocations_transaction(
     from_address: str, targets: List[str], assets: List[str]
 ) -> str:
-    """Prepare a transaction to withdraw assets from multiple core vaultss.
+    """Prepare a transaction to withdraw assets from multiple logarithm vaults.
     
     Args:
         from_address (str): Address that will send the transaction
-        targets (List[str]): List of core vault addresses to withdraw from
+        targets (List[str]): List of logarithm vault addresses to withdraw from
         assets (List[str]): List of asset amounts to withdraw (as strings to preserve precision)
         
     Returns:
