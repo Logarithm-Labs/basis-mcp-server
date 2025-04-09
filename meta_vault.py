@@ -7,7 +7,7 @@ META_VAULT_ABI_PATH = "abis/MetaVault.abi.json"
 CONTRACT_ADDRESS = os.environ.get("CONTRACT_ADDRESS", "") 
 
 # Initialize FastMCP server
-mcp = FastMCP("metavault")
+mcp = FastMCP("meta vault")
 
 # Read-only functions
 @mcp.tool()

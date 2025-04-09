@@ -39,7 +39,7 @@ export ARBITRUM_RPC_URL="https://your-arbitrum-rpc-url"
 ### Running the server
 
 ```bash
-uv run metavault.py
+uv run meta_vault.py
 ```
 
 ## Using with Claude Desktop
@@ -56,13 +56,13 @@ Add the following to the configuration:
 ```json
 {
     "mcpServers": {
-        "metavault": {
+        "meta vault": {
             "command": "uv",
             "args": [
                 "--directory",
                 "/ABSOLUTE/PATH/TO/PARENT/FOLDER/logarithm-mcp-server",
                 "run",
-                "metavault.py"
+                "meta_vault.py"
             ]
         }
     }
@@ -78,7 +78,7 @@ Add the following to the configuration:
                 "--directory",
                 "C:\\ABSOLUTE\\PATH\\TO\\PARENT\\FOLDER\\logarithm-mcp-server",
                 "run",
-                "metavault.py"
+                "meta_vault.py"
             ]
         }
     }

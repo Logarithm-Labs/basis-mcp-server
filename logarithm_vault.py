@@ -14,7 +14,7 @@ AVAILABLE_CONTRACTS = [
 ]
 
 # Initialize FastMCP server
-mcp = FastMCP("logarithmvault")
+mcp = FastMCP("logarithm vault")
 
 # Read-only functions
 @mcp.tool()
