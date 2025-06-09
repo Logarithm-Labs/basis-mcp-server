@@ -1,410 +1,109 @@
 from typing import List, Dict, Any, Optional, Tuple
 from mcp.server.fastmcp import FastMCP
-from web3_utils import get_contract, validate_address, to_hex, validate_address_list, get_transaction_count, format_transaction_data
-import os
-
-LOGARITHM_VAULT_ABI_PATH = "abis/LogarithmVault.abi.json"
-
-# Available Logarithm contract addresses
-AVAILABLE_CONTRACTS = [
-    "0x55d9615C3bEfe4B991d864892db2AaA6bcefc16C",
-    "0xa4885f18cb744aC5e48Bc8932fe4829B0022Df84",
-    "0x7b1E49EE1f796f3337ADD57edDE071C49F3CA8A3",
-    "0xddAF1C0B6aeDf286D0a50ab9386c3DE254af1b13"
-]
+from web3_utils import get_contract, encode_calldata, decode_string, decode_uint256, decode_multicall_try_block_and_aggregate_result, from_wei, from_szabo
+from constants import LOGARITHM_VAULT_ADDRESSES, MULTICALL_ADDRESSES, LOGARITHM_VAULT_ABI_PATH, MULTICALL_ABI_PATH, ALCHEMY_RPC_URLS
+import json
 
 # Initialize FastMCP server
-mcp = FastMCP("logarithm vault")
+mcp = FastMCP("Logarithm-vault")
 
-# Read-only functions
 @mcp.tool()
-async def get_asset(contract_address: str) -> str:
-    """Get the underlying asset address of the vault.
+async def get_all_logarithm_vault_info(depositor: Optional[str] = None) -> str:
+    """Returns a list of all available Logarithm vaults along with their information.
 
     Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The address of the underlying asset
+        depositor: The address of the depositor. If provided, additional information related to the depositor will be returned.
     """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.asset().call()
+
+    chain_id = 42161 # only support arbitrum for now
+    
+    # Load ABIs
+    with open(LOGARITHM_VAULT_ABI_PATH, 'r') as f:
+        vault_abi = json.load(f)
+    
+    calls = []
+    
+    for address in LOGARITHM_VAULT_ADDRESSES[chain_id]:
+        # derive calldata for each function using ABI
+        name_calldata = encode_calldata(vault_abi, 'name')
+        symbol_calldata = encode_calldata(vault_abi, 'symbol')
+        totalSupply_calldata = encode_calldata(vault_abi, 'totalSupply')
+        totalAssets_calldata = encode_calldata(vault_abi, 'totalAssets')
+        entryCost_calldata = encode_calldata(vault_abi, 'entryCost')
+        exitCost_calldata = encode_calldata(vault_abi, 'exitCost')
+        idleAssets_calldata = encode_calldata(vault_abi, 'idleAssets')
+        totalPendingWithdraw_calldata = encode_calldata(vault_abi, 'totalPendingWithdraw')
+        
+        # Create list of calls for multicall
+        calls.extend([
+            (address, name_calldata),
+            (address, symbol_calldata),
+            (address, totalSupply_calldata),
+            (address, totalAssets_calldata),
+            (address, entryCost_calldata),
+            (address, exitCost_calldata),
+            (address, idleAssets_calldata),
+            (address, totalPendingWithdraw_calldata)
+        ])
+        
+        if depositor:
+            maxDeposit_calldata = encode_calldata(vault_abi, 'maxDeposit', [depositor])
+            balanceOf_calldata = encode_calldata(vault_abi, 'balanceOf', [depositor])
+            calls.extend([
+                (address, maxDeposit_calldata),
+                (address, balanceOf_calldata)
+            ])
+    
+    # Execute multicall
+    multicall = get_contract(MULTICALL_ADDRESSES[chain_id], MULTICALL_ABI_PATH, ALCHEMY_RPC_URLS[chain_id])
+    result = multicall.functions.tryBlockAndAggregate(False, calls).call()
+    
+    # Decode results
+    block_number, return_data = decode_multicall_try_block_and_aggregate_result(result)
+    
+    # Process results for each vault
+    infos = {}
+    current_index = 0
+    calls_per_vault = len(calls) // len(LOGARITHM_VAULT_ADDRESSES[chain_id])
+    for address in LOGARITHM_VAULT_ADDRESSES[chain_id]:
+        # Parse results for this vault
+        infos[address] = {
+            f'name': decode_string(return_data[current_index][1]),
+            f'symbol': decode_string(return_data[current_index + 1][1]),
+            f'totalSupply': from_szabo(decode_uint256(return_data[current_index + 2][1])),
+            f'totalAssets': from_szabo(decode_uint256(return_data[current_index + 3][1])),
+            f'entryCostRate': from_wei(decode_uint256(return_data[current_index + 4][1])),
+            f'exitCostRate': from_wei(decode_uint256(return_data[current_index + 5][1])),
+            f'idleAssets': from_szabo(decode_uint256(return_data[current_index + 6][1])),
+            f'totalPendingWithdraw': from_szabo(decode_uint256(return_data[current_index + 7][1]))
+        }
+        if depositor:
+            infos[address].update({
+                f'maxDeposit': from_szabo(decode_uint256(return_data[current_index + 8][1])),
+                f'balanceOf': from_szabo(decode_uint256(return_data[current_index + 9][1]))
+            })
+        
+        current_index += calls_per_vault
+
+    result = f"### Logarithm Vaults (Chain ID: {chain_id}, Block Number: {block_number})\n\n"
+    for address, info in infos.items():
+        result += f"Address: {address}\n"
+        result += f"Name: {info[f'name']}\n"
+        result += f"Symbol: {info[f'symbol']}\n"
+        result += f"Total Supply: {info[f'totalSupply']}\n"
+        result += f"Total Assets: {info[f'totalAssets']}\n"
+        result += f"Entry Cost Rate: {info[f'entryCostRate']}\n"
+        result += f"Exit Cost Rate: {info[f'exitCostRate']}\n"
+        result += f"Idle Assets: {info[f'idleAssets']}\n"
+        if depositor:
+            result += f"Pending Withdraw: {info[f'totalPendingWithdraw']}\n"
+            result += f"Max Deposit: {info[f'maxDeposit']}\n"
+            result += f"Share Balance: {info[f'balanceOf']}\n\n"
+        else:
+            result += f"Pending Withdraw: {info[f'totalPendingWithdraw']}\n\n"
+
     return result
-
-@mcp.tool()
-async def get_assets_to_claim(contract_address: str) -> str:
-    """Get the total assets that are available to claim.
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The total claimable assets as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.assetsToClaim().call()
-    return str(result)
-
-@mcp.tool()
-async def get_balance_of(contract_address: str, account: str) -> str:
-    """Get the balance of shares for a specific account.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        account (str): Address of the account to check
-        
-    Returns:
-        str: The balance of shares as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    checksum_address = validate_address(account)
-    result = contract.functions.balanceOf(checksum_address).call()
-    return str(result)
-
-@mcp.tool()
-async def convert_to_assets(contract_address: str, shares: str) -> str:
-    """Convert a given amount of shares to the equivalent amount of assets.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        shares (str): Amount of shares to convert (as string to preserve precision)
-        
-    Returns:
-        str: The equivalent amount of assets as a string
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.convertToAssets(int(shares)).call()
-    return str(result)
-
-@mcp.tool()
-async def convert_to_shares(contract_address: str, assets: str) -> str:
-    """Convert a given amount of assets to the equivalent amount of shares.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        assets (str): Amount of assets to convert (as string to preserve precision)
-        
-    Returns:
-        str: The equivalent amount of shares as a string
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.convertToShares(int(assets)).call()
-    return str(result)
-
-@mcp.tool()
-async def get_decimals(contract_address: str) -> int:
-    """Get the number of decimals used by the vault shares.
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        int: The number of decimals
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.decimals().call()
-    return result
-
-@mcp.tool()
-async def get_entry_cost(contract_address: str) -> str:
-    """Get the current entry cost for the vault.
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The entry cost as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.entryCost().call()
-    return str(result)
-
-@mcp.tool()
-async def get_exit_cost(contract_address: str) -> str:
-    """Get the current exit cost for the vault.
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The exit cost as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.exitCost().call()
-    return str(result)
-
-@mcp.tool()
-async def get_idle_assets(contract_address: str) -> str:
-    """Get the total idle assets in the vault.
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The total idle assets as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.idleAssets().call()
-    return str(result)
-
-@mcp.tool()
-async def is_shutdown(contract_address: str) -> bool:
-    """Check if the vault is currently shutdown.
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        bool: True if the vault is shutdown, False otherwise
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    return contract.functions.isShutdown().call()
-
-@mcp.tool()
-async def get_max_deposit(contract_address: str, receiver: str) -> str:
-    """Get the maximum amount of assets that can be deposited for a receiver.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        receiver (str): Address that will receive the shares
-        
-    Returns:
-        str: The maximum deposit amount as a string
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    checksum_address = validate_address(receiver)
-    result = contract.functions.maxDeposit(checksum_address).call()
-    return str(result)
-
-@mcp.tool()
-async def get_max_mint(contract_address: str, receiver: str) -> str:
-    """Get the maximum amount of shares that can be minted for a receiver.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        receiver (str): Address that will receive the shares
-        
-    Returns:
-        str: The maximum mint amount as a string
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    checksum_address = validate_address(receiver)
-    result = contract.functions.maxMint(checksum_address).call()
-    return str(result)
-
-@mcp.tool()
-async def get_max_redeem(contract_address: str, owner: str) -> str:
-    """Get the maximum amount of shares that can be redeemed by an owner.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        owner (str): Address of the shares owner
-        
-    Returns:
-        str: The maximum redeem amount as a string
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    checksum_address = validate_address(owner)
-    result = contract.functions.maxRedeem(checksum_address).call()
-    return str(result)
-
-@mcp.tool()
-async def get_max_withdraw(contract_address: str, owner: str) -> str:
-    """Get the maximum amount of assets that can be withdrawn by an owner.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        owner (str): Address of the shares owner
-        
-    Returns:
-        str: The maximum withdraw amount as a string
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    checksum_address = validate_address(owner)
-    result = contract.functions.maxWithdraw(checksum_address).call()
-    return str(result)
-
-@mcp.tool()
-async def get_vault_info(contract_address: str) -> Dict[str, str]:
-    """Get the basic information about the vault (name and symbol).
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        Dict[str, str]: Dictionary containing name and symbol of the vault
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    name = contract.functions.name().call()
-    symbol = contract.functions.symbol().call()
-    return {
-        "name": name,
-        "symbol": symbol
-    }
-
-@mcp.tool()
-async def preview_deposit(contract_address: str, assets: str) -> str:
-    """Preview the amount of shares that would be minted for a deposit.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        assets (str): Amount of assets to deposit (as string to preserve precision)
-        
-    Returns:
-        str: The amount of shares that would be minted
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.previewDeposit(int(assets)).call()
-    return str(result)
-
-@mcp.tool()
-async def preview_mint(contract_address: str, shares: str) -> str:
-    """Preview the amount of assets needed for minting shares.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        shares (str): Amount of shares to mint (as string to preserve precision)
-        
-    Returns:
-        str: The amount of assets needed
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.previewMint(int(shares)).call()
-    return str(result)
-
-@mcp.tool()
-async def preview_redeem(contract_address: str, shares: str) -> str:
-    """Preview the amount of assets that would be received for redeeming shares.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        shares (str): Amount of shares to redeem (as string to preserve precision)
-        
-    Returns:
-        str: The amount of assets that would be received
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.previewRedeem(int(shares)).call()
-    return str(result)
-
-@mcp.tool()
-async def preview_withdraw(contract_address: str, assets: str) -> str:
-    """Preview the amount of shares needed to withdraw assets.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        assets (str): Amount of assets to withdraw (as string to preserve precision)
-        
-    Returns:
-        str: The amount of shares needed
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.previewWithdraw(int(assets)).call()
-    return str(result)
-
-@mcp.tool()
-async def get_total_assets(contract_address: str) -> str:
-    """Get the total assets managed by the vault.
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The total assets as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.totalAssets().call()
-    return str(result)
-
-@mcp.tool()
-async def get_total_supply(contract_address: str) -> str:
-    """Get the total supply of vault shares.
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The total supply as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.totalSupply().call()
-    return str(result)
-
-@mcp.tool()
-async def get_user_deposit_limit(contract_address: str) -> str:
-    """Get the maximum deposit limit per user.
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The user deposit limit as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.userDepositLimit().call()
-    return str(result)
-
-@mcp.tool()
-async def get_vault_deposit_limit(contract_address: str) -> str:
-    """Get the maximum total deposit limit for the vault.
-
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The vault deposit limit as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.vaultDepositLimit().call()
-    return str(result)
-
-@mcp.tool()
-async def get_available_contracts() -> List[str]:
-    """Get the list of available Logarithm contract addresses.
-
-    Returns:
-        List[str]: List of available contract addresses
-    """
-    return AVAILABLE_CONTRACTS
-
-@mcp.tool()
-async def get_share_price(contract_address: str) -> str:
-    """Calculate the share price of the vault.
-    
-    The share price is calculated as: totalAssets / totalSupply
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The share price as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    total_assets = contract.functions.totalAssets().call()
-    total_supply = contract.functions.totalSupply().call()
-    decimals = contract.functions.decimals().call()
-    
-    if total_supply == 0:
-        return "0"
-        
-    # Calculate share price with proper decimal handling
-    share_price = (total_assets * (10 ** decimals)) // total_supply
-    return str(share_price)
-
-@mcp.tool()
-async def get_total_pending_withdraw(contract_address: str) -> str:
-    """Get the total amount of assets pending withdrawal from the vault.
-    
-    Args:
-        contract_address (str): Address of the LogarithmVault contract
-        
-    Returns:
-        str: The total pending withdraw amount as a string (to preserve full precision)
-    """
-    contract = get_contract(contract_address, LOGARITHM_VAULT_ABI_PATH)
-    result = contract.functions.totalPendingWithdraw().call()
-    return str(result)
 
 if __name__ == "__main__":
-    # Run the MCP server
+    # Initialize and run the server
     mcp.run(transport='stdio')
