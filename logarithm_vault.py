@@ -1,7 +1,7 @@
 import json
 from typing import List, Dict, Any, Optional, Tuple
 from mcp.server.fastmcp import FastMCP
-from utils.web3 import validate_address, get_contract, encode_calldata, decode_string, decode_uint256, decode_multicall_try_block_and_aggregate_result, from_wei, from_szabo
+from utils.web3 import validate_address, get_contract, encode_calldata, decode_string, decode_uint256, decode_multicall_try_block_and_aggregate_result, from_wei, from_szabo, quantize_decimal
 from utils.subgraph import get_share_price_history_from_subgraph
 from constants import LOGARITHM_VAULT_ADDRESSES, MULTICALL_ADDRESSES, LOGARITHM_VAULT_ABI_PATH, MULTICALL_ABI_PATH, ALCHEMY_RPC_URLS, SUBGRAPH_API_KEY
 
@@ -17,6 +17,7 @@ async def get_all_logarithm_vault_info(depositor: Optional[str] = None) -> str:
         Symbol: The symbol of the vault.
         Total Supply: The total supply of the vault in decimals.
         Total Assets: The total assets of the vault in decimals.
+        Share Price: The current share price of the vault in decimals.
         Entry Cost Rate: The entry cost rate in decimals which is applied to the depositor when they deposit.
         Exit Cost Rate: The exit cost rate in decimals which is applied to the depositor when they withdraw.
         Idle Assets: The idle assets of the vault in decimals, offsetting exit costs.
@@ -80,12 +81,16 @@ async def get_all_logarithm_vault_info(depositor: Optional[str] = None) -> str:
     current_index = 0
     calls_per_vault = len(calls) // len(LOGARITHM_VAULT_ADDRESSES[chain_id])
     for address in LOGARITHM_VAULT_ADDRESSES[chain_id]:
+        total_supply = from_szabo(decode_uint256(return_data[current_index + 2][1]))
+        total_assets = from_szabo(decode_uint256(return_data[current_index + 3][1]))
+        share_price = quantize_decimal(total_assets / total_supply)
         # Parse results for this vault
         infos[address] = {
             f'name': decode_string(return_data[current_index][1]),
             f'symbol': decode_string(return_data[current_index + 1][1]),
-            f'totalSupply': from_szabo(decode_uint256(return_data[current_index + 2][1])),
-            f'totalAssets': from_szabo(decode_uint256(return_data[current_index + 3][1])),
+            f'totalSupply': total_supply,
+            f'totalAssets': total_assets,
+            f'sharePrice': share_price,
             f'entryCostRate': from_wei(decode_uint256(return_data[current_index + 4][1])),
             f'exitCostRate': from_wei(decode_uint256(return_data[current_index + 5][1])),
             f'idleAssets': from_szabo(decode_uint256(return_data[current_index + 6][1])),
@@ -106,6 +111,7 @@ async def get_all_logarithm_vault_info(depositor: Optional[str] = None) -> str:
         result += f"Symbol: {info[f'symbol']}\n"
         result += f"Total Supply: {info[f'totalSupply']}\n"
         result += f"Total Assets: {info[f'totalAssets']}\n"
+        result += f"Share Price: {info[f'sharePrice']}\n"
         result += f"Entry Cost Rate: {info[f'entryCostRate']}\n"
         result += f"Exit Cost Rate: {info[f'exitCostRate']}\n"
         result += f"Idle Assets: {info[f'idleAssets']}\n"

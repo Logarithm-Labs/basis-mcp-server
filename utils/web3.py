@@ -3,7 +3,7 @@ import json
 from web3 import Web3
 from web3.contract import Contract
 from eth_typing import ChecksumAddress
-from constants import LOGARITHM_VAULT_ABI_PATH, MULTICALL_ADDRESSES, MULTICALL_ABI_PATH
+from decimal import Decimal
 
 
 def get_contract(contract_address: str, abi_file_path: str, rpc_url: Optional[str] = None) -> Contract:
@@ -49,11 +49,17 @@ def to_hex(value: str) -> str:
     """Returns a hex presentation for a given value"""
     return Web3.to_hex(value)
 
-def from_wei(value):
-    return value / 1e18
+def from_wei(value: str) -> Decimal:
+    """Convert a value in wei to a decimal with the specified number of decimals."""
+    return quantize_decimal(Decimal(value) / Decimal(1e18))
 
-def from_szabo(value):
-    return value / 1e6
+def from_szabo(value: str) -> Decimal:
+    """Convert a value in szabo to a decimal with the specified number of decimals."""
+    return quantize_decimal(Decimal(value) / Decimal(1e6))
+
+def quantize_decimal(value: Decimal, decimals: int = 6) -> Decimal:
+    """Quantize a decimal to the specified number of decimals."""
+    return value.quantize(Decimal(f'1e-{decimals}'))
 
 def get_function_selector(abi, function_name):
     """Get function selector from ABI"""
