@@ -1,8 +1,12 @@
-
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 ALCHEMY_KEY = os.environ.get("ALCHEMY_KEY", None)
 PRIVATE_KEY = os.environ.get("PRIVATE_KEY", None)
+SUBGRAPH_API_KEY = os.environ.get("SUBGRAPH_API_KEY", None)
 
 # Available Logarithm vault addresses
 LOGARITHM_VAULT_ADDRESSES = {
@@ -24,3 +28,5 @@ ALCHEMY_RPC_URLS = {
     42161: f"https://arb-mainnet.g.alchemy.com/v2/{ALCHEMY_KEY}" if ALCHEMY_KEY else "https://arb1.arbitrum.io/rpc",
     1: f"https://eth-mainnet.g.alchemy.com/v2/{ALCHEMY_KEY}" if ALCHEMY_KEY else "",
 }
+
+SUBGRAPH_QUERY_URL = "https://gateway.thegraph.com/api/subgraphs/id/AH842SqnNHmMM54fY6eX9sGSV4BPo8fmeoj5C3qbNsr1"

@@ -1,9 +1,9 @@
+import json
 from typing import List, Dict, Any, Optional, Tuple
 from mcp.server.fastmcp import FastMCP
-import mcp.types as types
-from web3_utils import get_contract, encode_calldata, decode_string, decode_uint256, decode_multicall_try_block_and_aggregate_result, from_wei, from_szabo
-from constants import LOGARITHM_VAULT_ADDRESSES, MULTICALL_ADDRESSES, LOGARITHM_VAULT_ABI_PATH, MULTICALL_ABI_PATH, ALCHEMY_RPC_URLS
-import json
+from utils.web3 import validate_address, get_contract, encode_calldata, decode_string, decode_uint256, decode_multicall_try_block_and_aggregate_result, from_wei, from_szabo
+from utils.subgraph import get_share_price_history_from_subgraph
+from constants import LOGARITHM_VAULT_ADDRESSES, MULTICALL_ADDRESSES, LOGARITHM_VAULT_ABI_PATH, MULTICALL_ABI_PATH, ALCHEMY_RPC_URLS, SUBGRAPH_API_KEY
 
 # Initialize FastMCP server
 mcp = FastMCP("Logarithm-vault")
@@ -60,6 +60,7 @@ async def get_all_logarithm_vault_info(depositor: Optional[str] = None) -> str:
         ])
         
         if depositor:
+            depositor = validate_address(depositor)
             maxDeposit_calldata = encode_calldata(vault_abi, 'maxDeposit', [depositor])
             balanceOf_calldata = encode_calldata(vault_abi, 'balanceOf', [depositor])
             calls.extend([
@@ -108,14 +109,85 @@ async def get_all_logarithm_vault_info(depositor: Optional[str] = None) -> str:
         result += f"Entry Cost Rate: {info[f'entryCostRate']}\n"
         result += f"Exit Cost Rate: {info[f'exitCostRate']}\n"
         result += f"Idle Assets: {info[f'idleAssets']}\n"
+        result += f"Pending Withdraw: {info[f'totalPendingWithdraw']}\n"
         if depositor:
-            result += f"Pending Withdraw: {info[f'totalPendingWithdraw']}\n"
             result += f"Max Deposit: {info[f'maxDeposit']}\n"
-            result += f"Share Balance: {info[f'balanceOf']}\n\n"
-        else:
-            result += f"Pending Withdraw: {info[f'totalPendingWithdraw']}\n\n"
+            result += f"Share Balance: {info[f'balanceOf']}\n"
+        result += "\n---\n\n"
 
     return result
+
+@mcp.tool()
+async def get_share_price_history(vault_addresses: List[str], length: int = 14) -> str:
+    """Returns the latest daily share price history of the vaults.
+    Args:
+        vault_addresses: The addresses of the vaults.
+        length: The length of days to get the share price history for.
+    """
+    # Validate inputs
+    if not vault_addresses:
+        raise ValueError("Vault addresses are required")
+    
+    if length <= 0:
+        raise ValueError("Length must be a positive integer")
+    
+    if length > 365:
+        raise ValueError("Length cannot exceed 365 days")
+
+    # Check if API key is available
+    api_key = SUBGRAPH_API_KEY
+    if not api_key:
+        return "Error: SUBGRAPH_API_KEY environment variable is not set. Please configure your API key."
+    
+    # Validate vault addresses format
+    for addr in vault_addresses:
+        validate_address(addr)
+    
+    # Get data from subgraph
+    vault_data = get_share_price_history_from_subgraph(vault_addresses, length, api_key)
+    
+    # Check if data was returned
+    if not vault_data:
+        return f"No price history data found for the specified vault addresses: {', '.join(vault_addresses)}"
+    
+    # Check if any vaults have data
+    vaults_with_data = [addr for addr, data in vault_data.items() if data.get('price_history')]
+    if not vaults_with_data:
+        return f"No price history available for any of the specified vaults in the last {length} days"
+    
+    # Format the result
+    result = f"### Vault Share Price History (Last {length} days)\n\n"
+    
+    for vault_address, data in vault_data.items():
+        if not data or 'name' not in data or 'price_history' not in data:
+            result += f"**Vault Address:** {vault_address}\n"
+            result += "**Status:** No data available\n\n---\n\n"
+            continue
+        
+        price_history = data['price_history']
+        if not price_history:
+            result += f"**Vault:** {data.get('name', 'Unknown')}\n"
+            result += f"**Address:** {vault_address}\n"
+            result += "**Status:** No price history available\n\n---\n\n"
+            continue
+        
+        result += f"**Vault:** {data['name']}\n"
+        result += f"**Address:** {vault_address}\n"
+        result += f"**Price History ({len(price_history)} entries):**\n"
+        
+        for timestamp, price in price_history:
+            try:
+                from datetime import datetime
+                date_str = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+                result += f"  - {date_str} ({timestamp}): {price:.6f}\n"
+            except (ValueError, OSError) as e:
+                result += f"  - Invalid timestamp ({timestamp}): {price:.6f}\n"
+        
+        result += "\n---\n\n"
+    
+    return result
+        
+        
 
 if __name__ == "__main__":
     # Initialize and run the server
