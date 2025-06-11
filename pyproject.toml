@@ -5,6 +5,6 @@ description = "MPC server for agents to interact with Logarithm protocol."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "mcp[cli]>=1.6.0",
+    "mcp[cli]>=1.9.3",
     "web3>=7.10.0",
 ]

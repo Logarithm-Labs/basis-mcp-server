@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional, Tuple
 from mcp.server.fastmcp import FastMCP
+import mcp.types as types
 from web3_utils import get_contract, encode_calldata, decode_string, decode_uint256, decode_multicall_try_block_and_aggregate_result, from_wei, from_szabo
 from constants import LOGARITHM_VAULT_ADDRESSES, MULTICALL_ADDRESSES, LOGARITHM_VAULT_ABI_PATH, MULTICALL_ABI_PATH, ALCHEMY_RPC_URLS
 import json
@@ -10,6 +11,18 @@ mcp = FastMCP("Logarithm-vault")
 @mcp.tool()
 async def get_all_logarithm_vault_info(depositor: Optional[str] = None) -> str:
     """Returns a list of all available Logarithm vaults along with their information.
+    Vault Info Parameters Explained:
+        Address: The address of the vault.
+        Name: The name of the vault.
+        Symbol: The symbol of the vault.
+        Total Supply: The total supply of the vault in decimals.
+        Total Assets: The total assets of the vault in decimals.
+        Entry Cost Rate: The entry cost rate in decimals which is applied to the depositor when they deposit.
+        Exit Cost Rate: The exit cost rate in decimals which is applied to the depositor when they withdraw.
+        Idle Assets: The idle assets of the vault in decimals, offsetting exit costs.
+        Total Pending Withdraw: The total pending withdraw of the vault in decimals, offsetting entry costs.
+        Max Deposit: The max deposit of the depositor in decimals (null if no depositor provided).
+        Share Balance: The share balance of the depositor in decimals (null if no depositor provided).
 
     Args:
         depositor: The address of the depositor. If provided, additional information related to the depositor will be returned.
