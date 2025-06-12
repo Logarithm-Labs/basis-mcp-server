@@ -15,6 +15,7 @@ This MCP (Model Context Protocol) server provides tools to interact with Logarit
 
 - Python 3.10 or higher
 - `uv` package manager
+
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
@@ -24,21 +25,9 @@ This MCP (Model Context Protocol) server provides tools to interact with Logarit
 1. Clone this repository
 2. Install dependencies:
 
-```bash
-uv sync --locked
-```
-
-3. Configure environment variables:
-
-Create a `.env` file in the project root:
-
-```bash
-# Optional - Your Alchemy API key for Arbitrum One
-ALCHEMY_KEY=your_alchemy_key_here
-
-# Required - Your subgraph API key for price history queries
-SUBGRAPH_API_KEY=your_subgraph_api_key_here
-```
+    ```bash
+    uv sync --locked
+    ```
 
 ### Environment Variable Setup
 
@@ -210,7 +199,7 @@ You can ask Claude Desktop:
 ### Common Issues
 
 1. **"SUBGRAPH_API_KEY environment variable is not set"**
-   - Ensure your `.env` file contains the API key or set it as an environment variable
+   - Ensure setting it as an environment variable
 
 2. **"Invalid vault address format"**
    - Vault addresses must be valid Ethereum addresses (42 characters starting with 0x)

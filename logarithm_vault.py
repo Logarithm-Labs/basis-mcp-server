@@ -1,5 +1,5 @@
 import json
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Optional
 from mcp.server.fastmcp import FastMCP
 from utils.web3 import validate_address, get_contract, encode_calldata, decode_string, decode_uint256, decode_multicall_try_block_and_aggregate_result, from_wei, from_szabo, quantize_decimal
 from utils.subgraph import get_share_price_history_from_subgraph
@@ -142,8 +142,8 @@ async def get_share_price_history(vault_addresses: List[str], length: int = 14) 
 
     # Check if API key is available
     api_key = SUBGRAPH_API_KEY
-    if not api_key:
-        return "Error: SUBGRAPH_API_KEY environment variable is not set. Please configure your API key."
+    if api_key is None:
+        raise KeyError("Error: SUBGRAPH_API_KEY environment variable is not set. Please configure your API key.")
     
     # Validate vault addresses format
     for addr in vault_addresses:
@@ -154,12 +154,12 @@ async def get_share_price_history(vault_addresses: List[str], length: int = 14) 
     
     # Check if data was returned
     if not vault_data:
-        return f"No price history data found for the specified vault addresses: {', '.join(vault_addresses)}"
+        raise ValueError(f"No price history data found for the specified vault addresses: {', '.join(vault_addresses)}")
     
     # Check if any vaults have data
     vaults_with_data = [addr for addr, data in vault_data.items() if data.get('price_history')]
     if not vaults_with_data:
-        return f"No price history available for any of the specified vaults in the last {length} days"
+        raise ValueError(f"No price history available for any of the specified vaults in the last {length} days")
     
     # Format the result
     result = f"### Vault Share Price History (Last {length} days)\n\n"

@@ -1,8 +1,4 @@
 import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
 
 ALCHEMY_KEY = os.environ.get("ALCHEMY_KEY", None)
 PRIVATE_KEY = os.environ.get("PRIVATE_KEY", None)
