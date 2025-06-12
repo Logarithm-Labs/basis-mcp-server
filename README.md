@@ -8,6 +8,7 @@ This MCP (Model Context Protocol) server provides tools to interact with Logarit
 - **Share Price History**: Retrieve historical daily share price data for multiple vaults
 - **Multi-Vault Support**: Query multiple vault addresses simultaneously
 - **Depositor-Specific Data**: Get personalized vault information for specific depositor addresses
+- **Multiple Transport Modes**: Supports both STDIO and SSE (Server-Sent Events) transport protocols
 
 ## Setup
 
@@ -51,9 +52,27 @@ export SUBGRAPH_API_KEY="your_subgraph_api_key_here"
 
 ### Running the server
 
+#### STDIO Transport (Default)
+For use with Claude Desktop and other MCP clients that support STDIO:
+
 ```bash
 uv run logarithm_vault.py
 ```
+
+#### SSE Transport (Server-Sent Events)
+For web-based clients and HTTP-compatible integrations:
+
+```bash
+uv run logarithm_vault.py --transport sse --port 8000
+```
+
+**SSE Transport Options:**
+- `--transport sse`: Enable Server-Sent Events transport mode
+- `--port 8000`: Specify the port to listen on (default: 8000)
+
+The SSE server will be available at `http://localhost:8000` and provides:
+- SSE endpoint: `http://localhost:8000/sse`
+- Message endpoint: `http://localhost:8000/messages`
 
 ## Using with Claude Desktop
 
@@ -74,7 +93,7 @@ Add the following to the configuration:
             "command": "uv",
             "args": [
                 "--directory",
-                "/ABSOLUTE/PATH/TO/logarithm-mcp-server"
+                "/ABSOLUTE/PATH/TO/logarithm-mcp-server",
                 "run",
                 "logarithm_vault.py"
             ],
@@ -92,10 +111,10 @@ Add the following to the configuration:
 {
     "mcpServers": {
         "logarithm-vault": {
-            "command": "python",
+            "command": "uv",
             "args": [
                 "--directory",
-                "C:\\ABSOLUTE\\PATH\\TO\\logarithm-mcp-server"
+                "C:\\ABSOLUTE\\PATH\\TO\\logarithm-mcp-server",
                 "run",
                 "logarithm_vault.py"
             ],

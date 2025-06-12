@@ -1,5 +1,6 @@
 import json
-from typing import List, Optional
+import click
+from typing import List, Dict, Any, Optional, Tuple
 from mcp.server.fastmcp import FastMCP
 from utils.web3 import validate_address, get_contract, encode_calldata, decode_string, decode_uint256, decode_multicall_try_block_and_aggregate_result, from_wei, from_szabo, quantize_decimal
 from utils.subgraph import get_share_price_history_from_subgraph
@@ -192,9 +193,21 @@ async def get_share_price_history(vault_addresses: List[str], length: int = 14) 
         result += "\n---\n\n"
     
     return result
-        
+
+
+
+@click.command()
+@click.option("--port", default=8000, help="Port to listen on for SSE")
+@click.option(
+    "--transport",
+    type=click.Choice(["stdio", "sse"]),
+    default="stdio",
+    help="Transport type",
+)
+def main(port: int, transport: str) -> int:
+    mcp.settings.port = port
+    mcp.run(transport=transport)
         
 
 if __name__ == "__main__":
-    # Initialize and run the server
-    mcp.run(transport='stdio')
+    main()
